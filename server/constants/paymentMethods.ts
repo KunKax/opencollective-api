@@ -3,6 +3,7 @@ export enum PAYMENT_METHOD_SERVICE {
   STRIPE = 'stripe',
   OPENCOLLECTIVE = 'opencollective',
   PREPAID = 'prepaid',
+  PRIVACY = 'privacy',
 }
 export const PAYMENT_METHOD_SERVICES = Object.values(PAYMENT_METHOD_SERVICE);
 
