@@ -148,9 +148,10 @@ export default app => {
       logger.error(`GraphQL error: ${err.message}`);
       const extra = pick(err, ['locations', 'path']);
       if (Object.keys(extra).length) {
-        logger.error(extra);
+        logger.error(JSON.stringify(extra));
       }
-      const stacktrace = get(err, 'err.extensions.exception.stacktrace');
+
+      const stacktrace = get(err, 'extensions.exception.stacktrace');
       if (stacktrace) {
         logger.error(stacktrace);
       }

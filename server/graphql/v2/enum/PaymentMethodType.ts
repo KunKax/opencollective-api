@@ -4,12 +4,13 @@ import { PAYMENT_METHOD_SERVICE, PAYMENT_METHOD_TYPE } from '../../../constants/
 import logger from '../../../lib/logger';
 import { PaymentMethod } from '../../../types/PaymentMethod';
 
-enum PaymentMethodTypeEnum {
+export enum PaymentMethodTypeEnum {
   CREDIT_CARD = 'CREDIT_CARD',
   GIFT_CARD = 'GIFT_CARD',
   PREPAID_BUDGET = 'PREPAID_BUDGET',
   ACCOUNT_BALANCE = 'ACCOUNT_BALANCE',
   PAYPAL = 'PAYPAL',
+  BRAINTREE_PAYPAL = 'BRAINTREE_PAYPAL',
   BANK_TRANSFER = 'BANK_TRANSFER',
   ADDED_FUNDS = 'ADDED_FUNDS',
 }
@@ -36,10 +37,10 @@ export const getPaymentMethodType = ({ service, type }: PaymentMethod): PaymentM
     } else if (type === PAYMENT_METHOD_TYPE.PREPAID) {
       return PaymentMethodTypeEnum.PREPAID_BUDGET;
     }
-  } else if (service === PAYMENT_METHOD_SERVICE.PAYPAL) {
-    if (type === PAYMENT_METHOD_TYPE.PAYMENT) {
-      return PaymentMethodTypeEnum.PAYPAL;
-    }
+  } else if (service === PAYMENT_METHOD_SERVICE.BRAINTREE && type === PAYMENT_METHOD_TYPE.PAYPAL) {
+    return PaymentMethodTypeEnum.BRAINTREE_PAYPAL;
+  } else if (service === PAYMENT_METHOD_SERVICE.PAYPAL && type === PAYMENT_METHOD_TYPE.PAYMENT) {
+    return PaymentMethodTypeEnum.PAYPAL;
   }
 
   logger.warn(`getPaymentMethodType: Unknown PM type for ${service}/${type}`);
@@ -63,5 +64,7 @@ export const getLegacyServiceTypeFromPaymentMethodType = (type: PaymentMethodTyp
       return { service: PAYMENT_METHOD_SERVICE.OPENCOLLECTIVE, type: PAYMENT_METHOD_TYPE.MANUAL };
     case PaymentMethodTypeEnum.PAYPAL:
       return { service: PAYMENT_METHOD_SERVICE.PAYPAL, type: PAYMENT_METHOD_TYPE.PAYMENT };
+    case PaymentMethodTypeEnum.BRAINTREE_PAYPAL:
+      return { service: PAYMENT_METHOD_SERVICE.BRAINTREE, type: PAYMENT_METHOD_TYPE.PAYPAL };
   }
 };

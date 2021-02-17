@@ -3,8 +3,9 @@ import { pick } from 'lodash';
 
 import { PAYMENT_METHOD_SERVICE, PAYMENT_METHOD_TYPE } from '../../../constants/paymentMethods';
 import { PaymentMethodType } from '../enum';
-import { getLegacyServiceTypeFromPaymentMethodType } from '../enum/PaymentMethodType';
+import { getLegacyServiceTypeFromPaymentMethodType, PaymentMethodTypeEnum } from '../enum/PaymentMethodType';
 
+import { BraintreePaymentInput } from './BraintreePaymentInput';
 import { CreditCardCreateInput } from './CreditCardCreateInput';
 import { fetchPaymentMethodWithReference } from './PaymentMethodReferenceInput';
 import { PaypalPaymentInput } from './PaypalPaymentInput';
@@ -37,6 +38,10 @@ export const PaymentMethodInput = new GraphQLInputObjectType({
       type: PaypalPaymentInput,
       description: 'To pass when type is PAYPAL',
     },
+    braintreeInfo: {
+      type: BraintreePaymentInput,
+      description: 'To pass when type is BRAINTREE',
+    },
   }),
 });
 
@@ -51,6 +56,17 @@ export const getLegacyPaymentMethodFromPaymentMethodInput = async (
     return null;
   } else if (pm.id) {
     return fetchPaymentMethodWithReference(pm);
+  } else if (pm.type === PaymentMethodTypeEnum.BRAINTREE_PAYPAL) {
+    return {
+      service: PAYMENT_METHOD_SERVICE.BRAINTREE,
+      type: PAYMENT_METHOD_TYPE.PAYPAL,
+      token: pm.braintreeInfo?.nonce,
+      name: pm.braintreeInfo?.description, // TODO Retrieve PayPal account name
+      data: {
+        accountType: pm.braintreeInfo?.type,
+        ...pick(pm.braintreeInfo, ['details', 'binData', 'deviceData']),
+      },
+    };
   } else if (pm.creditCardInfo) {
     return {
       service: PAYMENT_METHOD_SERVICE.STRIPE,
