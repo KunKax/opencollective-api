@@ -1,5 +1,5 @@
 import config from 'config';
-import { GraphQLBoolean, GraphQLList, GraphQLNonNull, GraphQLObjectType, GraphQLString } from 'graphql';
+import { GraphQLBoolean, GraphQLNonNull, GraphQLObjectType, GraphQLString } from 'graphql';
 
 import { TOKEN_EXPIRATION_SESSION } from '../../../lib/auth';
 import emailLib from '../../../lib/email';
@@ -108,10 +108,6 @@ const guestMutations = {
         type: new GraphQLNonNull(GraphQLString),
         description: 'The key that you want to edit in settings',
       },
-      guestTokens: {
-        type: new GraphQLList(new GraphQLNonNull(GraphQLString)),
-        description: 'This can be used to link the other guest contributions to the user',
-      },
     },
     async resolve(
       _: void,
@@ -129,15 +125,9 @@ const guestMutations = {
         throw new RateLimitExceeded();
       }
 
-      const guestTokens = <string[] | null>args.guestTokens;
-      if (guestTokens?.length > 30) {
-        throw new Error('Cannot link more than 30 profiles at the same time');
-      }
-
       const { user, collective } = await confirmGuestAccountByEmail(
         <string>args.email,
         <string>args.emailConfirmationToken,
-        <string[]>args.guestTokens,
       );
 
       const accessToken = user.jwt({}, TOKEN_EXPIRATION_SESSION);

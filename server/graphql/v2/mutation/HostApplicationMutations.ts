@@ -1,4 +1,5 @@
 import { GraphQLNonNull, GraphQLObjectType, GraphQLString } from 'graphql';
+import GraphQLJSON from 'graphql-type-json';
 
 import { activities } from '../../../constants';
 import { types as CollectiveType } from '../../../constants/collectives';
@@ -11,6 +12,7 @@ import { HostApplicationStatus } from '../../../models/HostApplication';
 import { NotFound, Unauthorized, ValidationFailed } from '../../errors';
 import { ProcessHostApplicationAction } from '../enum/ProcessHostApplicationAction';
 import { AccountReferenceInput, fetchAccountWithReference } from '../input/AccountReferenceInput';
+import { Account } from '../interface/Account';
 import { Collective } from '../object/Collective';
 import Conversation from '../object/Conversation';
 
@@ -30,7 +32,7 @@ const ProcessHostApplicationResponse = new GraphQLObjectType({
 
 const HostApplicationMutations = {
   applyToHost: {
-    type: new GraphQLNonNull(Collective),
+    type: new GraphQLNonNull(Account),
     description: 'Apply to an host with a collective',
     args: {
       collective: {
@@ -45,6 +47,10 @@ const HostApplicationMutations = {
         type: GraphQLString,
         description: 'A message to attach for the host to review the application',
       },
+      applicationData: {
+        type: GraphQLJSON,
+        description: 'Further information about collective applying to host',
+      },
     },
     async resolve(_, args, req): Promise<object> {
       if (!req.remoteUser) {
@@ -55,11 +61,11 @@ const HostApplicationMutations = {
       if (!collective) {
         throw new NotFound('Collective not found');
       }
-      if (collective.type !== CollectiveType.COLLECTIVE) {
-        throw new Error('Account not a Collective');
+      if (![CollectiveType.COLLECTIVE, CollectiveType.FUND].includes(collective.type)) {
+        throw new Error('Account must be a collective or a fund');
       }
       if (!req.remoteUser.isAdminOfCollective(collective)) {
-        throw new Unauthorized('You need to be an Admin of the Collective');
+        throw new Unauthorized('You need to be an Admin of the account');
       }
 
       const host = await fetchAccountWithReference(args.host);
@@ -69,7 +75,10 @@ const HostApplicationMutations = {
 
       // No need to check the balance, this is being handled in changeHost, along with most other checks
 
-      return collective.changeHost(host.id, req.remoteUser, args.message);
+      return collective.changeHost(host.id, req.remoteUser, {
+        message: args.message,
+        applicationData: args.applicationData,
+      });
     },
   },
   processHostApplication: {

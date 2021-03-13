@@ -19,7 +19,6 @@ import {
   fakePayoutMethod,
   fakeTransaction,
   fakeUser,
-  multiple,
   randStr,
 } from '../../test-helpers/fake-data';
 import * as utils from '../../utils';
@@ -357,7 +356,7 @@ describe('server/models/Collective', () => {
 
     it('fails to deactivate as host if it is hosting any collective', async () => {
       try {
-        await hostUser.collective.deactivateAsHost({ remoteUser: hostUser });
+        await hostUser.collective.deactivateAsHost();
         throw new Error("Didn't throw expected error!");
       } catch (e) {
         expect(e.message).to.contain("You can't deactivate hosting while still hosting");
@@ -434,6 +433,7 @@ describe('server/models/Collective', () => {
       const plan = await hostUser.collective.getPlan();
 
       expect(plan).to.deep.equal({
+        id: 3,
         name: 'default',
         hostedCollectives: 2,
         addedFunds: 0,
@@ -488,7 +488,7 @@ describe('server/models/Collective', () => {
 
   it('computes the balance until a certain month', done => {
     const until = new Date('2016-07-01');
-    collective.getBalance(until).then(balance => {
+    collective.getBalance({ endDate: until }).then(balance => {
       let sum = 0;
       transactions.map(t => {
         if (t.createdAt < until) {
@@ -527,7 +527,7 @@ describe('server/models/Collective', () => {
       data: { payout_batch_id: 1 },
     });
 
-    const balance = await collective.getBalance();
+    const balance = await collective.getBalanceWithBlockedFunds();
     expect(balance).to.equal(45000 - 30000);
   });
 
@@ -1066,7 +1066,7 @@ describe('server/models/Collective', () => {
       await utils.resetTestDB();
     });
 
-    let gbpHost, socialCollective;
+    let gbpHost, socialCollective, metrics;
     before(async () => {
       await utils.resetTestDB();
       const user = await fakeUser({ id: 30 }, { id: 20, slug: 'pia' });
@@ -1085,6 +1085,7 @@ describe('server/models/Collective', () => {
 
       socialCollective = await fakeCollective({ HostCollectiveId: gbpHost.id });
       const transactionProps = {
+        amount: 100,
         type: 'CREDIT',
         CollectiveId: socialCollective.id,
         currency: 'GBP',
@@ -1131,11 +1132,24 @@ describe('server/models/Collective', () => {
         createdAt: lastMonth,
         PaymentMethodId: stripePaymentMethod.id,
       });
+      // Different Currency Transaction
+      const otherCollective = await fakeCollective({ currency: 'USD', HostCollectiveId: gbpHost.id });
+      await fakeTransaction({
+        type: 'CREDIT',
+        CollectiveId: otherCollective.id,
+        amount: 1000,
+        currency: 'USD',
+        hostCurrency: 'GBP',
+        HostCollectiveId: gbpHost.id,
+        hostCurrencyFxRate: 0.8,
+        createdAt: lastMonth,
+      });
+
+      metrics = await gbpHost.getHostMetrics(lastMonth);
     });
 
     it('returns acurate metrics for requested month', async () => {
-      const metrics = await gbpHost.getHostMetrics(lastMonth);
-      const expectedTotalMoneyManaged = await socialCollective.getBalance();
+      const expectedTotalMoneyManaged = 2400 + 4000 + 100 + 1000 * 0.8;
 
       expect(metrics).to.deep.equal({
         hostFees: 800,
@@ -1144,6 +1158,7 @@ describe('server/models/Collective', () => {
         platformTips: 331,
         pendingPlatformTips: 81,
         hostFeeShare: 0,
+        pendingHostFeeShare: 0,
         hostFeeSharePercent: 0,
         totalMoneyManaged: expectedTotalMoneyManaged,
       });

@@ -25,7 +25,6 @@ export function setupModels(client) {
     'Expense',
     'ExpenseAttachedFile',
     'ExpenseItem',
-    'GuestToken',
     'HostApplication',
     'LegalDocument',
     'Member',
@@ -72,10 +71,6 @@ export function setupModels(client) {
     foreignKey: 'CollectiveId',
     constraints: false,
   });
-
-  // GuestTokens
-  m.GuestToken.belongsTo(m.Collective, { as: 'collective', foreignKey: 'CollectiveId' });
-  m.GuestToken.belongsTo(m.User, { as: 'user', foreignKey: 'UserId' });
 
   // Members
   m.Member.belongsTo(m.User, {
@@ -131,8 +126,8 @@ export function setupModels(client) {
     as: 'fromCollective',
   });
   m.Transaction.belongsTo(m.Collective, {
-    foreignKey: 'UsingVirtualCardFromCollectiveId',
-    as: 'usingVirtualCardFromCollective',
+    foreignKey: 'UsingGiftCardFromCollectiveId',
+    as: 'usingGiftCardFromCollective',
   });
 
   m.Transaction.belongsTo(m.User, {

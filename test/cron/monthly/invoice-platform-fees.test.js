@@ -5,6 +5,7 @@ import { run as invoicePlatformFees } from '../../../cron/monthly/invoice-platfo
 import { sequelize } from '../../../server/models';
 import {
   fakeCollective,
+  fakeConnectedAccount,
   fakeHost,
   fakePaymentMethod,
   fakePayoutMethod,
@@ -24,13 +25,28 @@ describe('cron/monthly/invoice-platform-fees', () => {
 
     // Move Collectives ID auto increment pointer up, so we don't collide with the manually created id:1
     await sequelize.query(`ALTER SEQUENCE "Collectives_id_seq" RESTART WITH 1453`);
-    await fakePayoutMethod({
-      id: 2955,
+    const payoutProto = {
+      data: {
+        details: {},
+        type: 'IBAN',
+        accountHolderName: 'OpenCollective Inc.',
+        currency: 'USD',
+      },
       CollectiveId: oc.id,
       type: 'BANK_ACCOUNT',
+    };
+    await fakePayoutMethod({
+      ...payoutProto,
+      id: 2955,
+    });
+    await fakePayoutMethod({
+      ...payoutProto,
+      id: 2956,
+      data: { ...payoutProto.data, currency: 'GBP' },
     });
 
-    gbpHost = await fakeHost({ currency: 'GBP', plan: 'grow-plan-2021' });
+    gbpHost = await fakeHost({ currency: 'GBP', plan: 'grow-plan-2021', data: { plan: { pricePerCollective: 100 } } });
+    await fakeConnectedAccount({ CollectiveId: gbpHost.id, service: 'transferwise' });
 
     const socialCollective = await fakeCollective({ HostCollectiveId: gbpHost.id });
     const transactionProps = {
@@ -112,6 +128,10 @@ describe('cron/monthly/invoice-platform-fees', () => {
     expect(expense).to.have.nested.property('data.isPlatformTipSettlement', true);
   });
 
+  it('should use a payout method compatible with the host currency', () => {
+    expect(expense).to.have.property('PayoutMethodId', 2956);
+  });
+
   it('should invoice platform fees not collected through Stripe', async () => {
     const platformFeesItem = expense.items.find(p => p.description == 'Platform Fees');
     expect(platformFeesItem).to.have.property('amount', 300);
@@ -137,5 +157,10 @@ describe('cron/monthly/invoice-platform-fees', () => {
       p => p.description == 'Reimburse: Payment Processor Fee for collected Platform Tips',
     );
     expect(reimburseItem).to.have.property('amount', Math.round(-100 / 1.23));
+  });
+
+  it('should consider fixed fee per host collective', async () => {
+    const reimburseItem = expense.items.find(p => p.description == 'Fixed Fee per Hosted Collective');
+    expect(reimburseItem).to.have.property('amount', 100);
   });
 });
